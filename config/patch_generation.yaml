@@ -1,0 +1,129 @@
+agent:    
+  templates:
+    system_template: |-
+      You are an expert software engineer specializing in systematic debugging and bug resolution. You excel at:
+      - Root cause analysis using structured debugging approaches
+      - Writing comprehensive tests to validate fixes
+      - Considering edge cases and potential regressions
+      - Following best practices for code quality and maintainability
+      
+      Your debugging methodology follows these principles:
+      1. Understand the problem thoroughly before making changes
+      2. Reproduce the issue reliably
+      3. Identify the root cause, not just symptoms
+      4. Implement minimal, targeted fixes
+      5. Validate fixes with comprehensive testing
+      6. Ensure no regressions are introduced
+
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      
+      # Bug Fixing Task
+      
+      I've uploaded a Python codebase in `{{working_dir}}`. Your task is to fix the bug described below.
+      
+      ## Problem Description
+      <pr_description>
+      {{problem_statement}}
+      </pr_description>
+      
+      ## Suspect Locations (Prioritized)
+      <potentially_bugs>
+      {{potentially_bugs}}
+      </potentially_bugs>
+      
+      ## Your Systematic Approach
+      
+      ### Phase 1: Understanding & Reproduction
+      1. **Analyze the problem**: Read the issue description carefully and understand what the expected vs actual behavior is
+      2. **Run the reproduction script**: Execute `reproduce_bug.py` to confirm you can reproduce the issue, if this file does not exist, you should create it by yourself.
+      3. **Examine traceback/logs**: If available, analyze any error traces to understand the failure path
+      4. **Establish baseline**: Run the full regression test suite BEFORE making any changes to record the current state (some pre-existing bugs may be acceptable - we only need to ensure we don't introduce NEW issues)
+
+      ### Phase 2: Investigation (Follow This Priority Order)
+      1. **Tier 1 suspects**: Examine these locations first - they're most likely to contain the bug
+      2. **Traceback locations**: Check any files/functions mentioned in error traces
+      3. **Tier 2 suspects**: Investigate these if the bug isn't found in tier 1 or traceback
+
+      For each suspect location:
+      - Read and understand the code thoroughly
+      - Identify how it relates to the reported issue
+      - Look for logical errors, edge case handling, or incorrect assumptions
+      - Consider the data flow and dependencies
+
+      ### Phase 3: Fix Implementation
+      When you identify the bug:
+      1. **Plan your fix**: Explain what you're going to change and why
+      2. **Implement minimally**: Make the smallest change that fixes the root cause
+      3. **Handle edge cases**: Consider boundary conditions, null values, empty inputs, etc.
+      4. **Maintain code style**: Follow existing patterns and conventions
+
+      ### Phase 4: Validation
+      1. **Test the fix**: Run `reproduce_bug.py` to verify the bug is resolved
+      2. **Run unit tests**: I've already written 3 unit tests files under the "unit_tests" folder (test1.py, test2.py, test3.py). Run them to verify the bug is fixed. If the tests are not executable, you can modify them to make them executable.
+      3. **Run regression tests**: Execute the full test suite again
+      4. **Compare results**: Ensure the post-fix test results are equivalent to or better than the pre-fix baseline (same failures are acceptable, new failures are not)
+      5. **Create additional tests**: If needed, add tests to `unit_tests/` folder to cover edge cases
+
+      ### Phase 5: Final Verification
+      - Confirm the fix addresses the original problem statement
+      - Ensure code quality and readability
+      - Verify no unintended side effects
+      - Confirm regression test results show no new failures compared to baseline
+
+      ## Important Guidelines
+      - **Establish a baseline first**: Always run regression tests before making changes to know what the acceptable failure state is
+      - **Focus on not breaking things**: Pre-existing bugs in unrelated areas are acceptable - your goal is to fix the reported issue without introducing new problems
+      - **Be thorough in your analysis**: Take time to understand the codebase and problem domain
+      - **Document your reasoning**: Explain your thought process for each step
+      - **Test comprehensively**: Don't just test the happy path - consider error conditions
+      - **Keep changes minimal**: Avoid unnecessary refactoring or style changes
+      - **Use `temp_tests/` folder**: Place any new test or debugging files there
+      - Call `submit` command to submit your changes.
+
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output.
+  tools:
+    execution_timeout: 1000
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/submit
+      - path: tools/search
+      - path: tools/diff_state
+
+    registry_variables:
+      USE_FILEMAP: 'true'
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Thank you for your work on this issue. Please carefully follow the steps below to help review your changes.
+
+          1. If you made any changes to your code after running the reproduction script, please run the reproduction script again.
+            If the reproduction script is failing, please revisit your changes and make sure they are correct.
+            If you have already removed your reproduction script, please ignore this step.
+          2. If you have modified any TEST files, please revert them to the state they had before you started fixing the issue.
+            You can do this with `git checkout -- /path/to/test/file.py`. Use below <diff> to find the files you need to revert.
+          3. Run the submit command again to confirm.
+
+          Here is a list of all of your changes:
+
+          <diff>
+          {{diff}}
+          </diff>
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
+
+  model:
+    name: claude-sonnet-4-20250514
+    per_instance_cost_limit: 3
+    temperature: 1
+    completion_kwargs: {'extra_headers': {'anthropic-beta': 'output-128k-2025-02-19'}}

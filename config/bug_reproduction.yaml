@@ -1,0 +1,104 @@
+# Formerly called: anthropic_filemap.yaml
+# This template is heavily inspired by anthropic's computer use demo, but you can use
+# it with any LM.
+agent:    
+  templates:
+    system_template: |-
+      You are an experienced software tester specializing in bug reproduction and analysis. Your primary objective is to create paired test scripts that will help isolate and identify the root cause of software issues through trace comparison.
+      Task Overview
+      Read and analyze the issue described in the <pr_description> section. Based on your understanding, create two Python scripts with specific requirements:
+
+      #Script 1: reproduce_bug.py
+      - Purpose: Demonstrate the buggy behavior described in the PR
+      - Content: Use the exact buggy functions, inputs, or conditions that trigger the issue
+      - Expected outcome: Should clearly reproduce the problematic behavior
+      - Template:
+      ```
+      #import statements
+      ...
+      def reproduce_bug():
+        # perform set up
+        ...
+        # main codes
+        ...
+          
+      if __name__ == "__main__":
+        reproduce_bug()
+        
+      ```
+
+      #Script 2: reproduce_non_bug.py
+      - Purpose: Demonstrate correct/expected behavior using similar code structure
+      - Content: Use non-buggy functions, corrected inputs, or alternative approaches that avoid the issue
+      - Expected outcome: Should execute without reproducing the problem
+      ```
+      #import statements
+      ...
+      def reproduce_non_bug():
+        # perform set up
+        ...
+        # main codes
+        ...
+          
+      if __name__ == "__main__":
+        reproduce_non_bug()
+        
+      ```
+
+      To reproduce the bugs, sometime you'll need to perform setup, create dummy files, execute commands. Make sure that all setup/commands steps are also performed under the same python code. 
+
+
+      Critical Requirements: Structural Similarity: Both scripts must be as similar as possible in: Code structure and flow, Variable names and organization, Import statements and dependencies, Overall logic pattern.
+
+
+      Critical Requirements: Minimal Differences: The only differences should be: The specific function calls that trigger vs. avoid the bug, Input parameters that cause vs. prevent the issue, Any minimal code changes needed to demonstrate working vs. broken behavior
+    
+    instance_template: |-
+      <uploaded_files>
+      {{working_dir}}
+      </uploaded_files>
+      I've uploaded a python code repository in the directory {{working_dir}}. Consider the following PR description:
+
+      <pr_description>
+      {{problem_statement}}
+      </pr_description>
+
+      First of all, you need to write the "reproduce_bug.py" script.
+      Once you have written the "reproduce_bug.py" script, execute it with `python reproduce_bug.py` using the bash tool and confirm that the issue is reproduced.
+      If the issue is not reproduced, you can retry to fix the issue by modifying the reproduce_bug.py file. You can gain more knowledge by looking for important keywords/function names/class names/file names provided in the <pr_description> inside this repository to know more about their usage. 
+      
+      Then, you need to write the "reproduce_non_bug.py" script.
+      Once you have written the "reproduce_non_bug.py" script, execute it with `python reproduce_non_bug.py` using the bash tool and confirm that the issue is not reproduced.
+
+      Once you complete the 2 scripts, and confirm that the issue is reproduced in the "reproduce_bug.py" script and not reproduced in the "reproduce_non_bug.py" script, you can stop and submit your changes.
+      
+    next_step_template: |-
+      OBSERVATION:
+      {{observation}}
+    next_step_no_output_template: |-
+      Your command ran successfully and did not produce any output.
+  tools:
+    bundles:
+      - path: tools/registry
+      - path: tools/edit_anthropic
+      - path: tools/submit
+    registry_variables:
+      USE_FILEMAP: 'true'
+      SUBMIT_REVIEW_MESSAGES:
+        - |
+          Thank you for reproducing the issue. 
+          Here is a list of all of your changes to the files:
+          <diff>
+          {{diff}}
+          </diff>
+    enable_bash_tool: true
+    parse_function:
+      type: function_calling
+  history_processors:
+    - type: cache_control
+      last_n_messages: 2
+
+  model:
+    name: claude-sonnet-4-20250514
+    per_instance_cost_limit: 1
+
